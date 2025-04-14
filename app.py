@@ -8,7 +8,7 @@ from datetime import datetime
 from PIL import Image, ImageEnhance
 import os
 
-app = Flask(__name__)
+app = Flask(__name__) init_db()
 app.secret_key = os.environ.get('SECRET_KEY', 'ma_cle_secrete_123')
 app.config['UPLOAD_FOLDER'] = 'static/images'
 
@@ -23,7 +23,7 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    conn = sqlite3.connect('crm_immobilier.db')
+    conn = sqlite3.connect('crm.db')
     curseur = conn.cursor()
     curseur.execute('SELECT id, username FROM users WHERE id = ?', (user_id,))
     user = curseur.fetchone()
@@ -33,7 +33,7 @@ def load_user(user_id):
     return None
 
 def init_db():
-    conn = sqlite3.connect('crm_immobilier.db')
+    conn = sqlite3.connect('crm.db')
     curseur = conn.cursor()
     curseur.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -75,7 +75,7 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        conn = sqlite3.connect('crm_immobilier.db')
+        conn = sqlite3.connect('crm.db')
         curseur = conn.cursor()
         curseur.execute('SELECT id, username FROM users WHERE username = ? AND password = ?', 
                         (username, password))
@@ -102,7 +102,7 @@ def dashboard():
 @app.route('/pige', methods=['GET', 'POST'])
 @login_required
 def pige():
-    conn = sqlite3.connect('crm_immobilier.db')
+    conn = sqlite3.connect('crm.db')
     curseur = conn.cursor()
     
     if request.method == 'POST':
@@ -143,7 +143,7 @@ def photo_staging():
         processed_filepath = os.path.join(app.config['UPLOAD_FOLDER'], processed_filename)
         img_enhanced.save(processed_filepath)
         
-        conn = sqlite3.connect('crm_immobilier.db')
+        conn = sqlite3.connect('crm.db')
         curseur = conn.cursor()
         curseur.execute('UPDATE pige SET photo_path = ? WHERE id = (SELECT MAX(id) FROM pige WHERE user_id = ?)',
                         (processed_filename, current_user.id))

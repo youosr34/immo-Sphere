@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Amélioration de Photos & Home Staging</h2>
+    <form method="POST" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+            {{ form.photo.label(class="form-label") }}
+            {{ form.photo(class="form-control") }}
+        </div>
+        {{ form.submit(class="btn btn-primary") }}
+    </form>
+
+    {% if processed_image %}
+        <h3>Photo améliorée :</h3>
+        <img src="{{ url_for('serve_image', filename=processed_image) }}" alt="Photo améliorée" class="img-fluid mt-3" style="max-width: 500px;">
+    {% endif %}
+{% endblock %}

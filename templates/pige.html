@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Pige Immobilière</h2>
+    <form method="POST" class="mb-4">
+        <div class="row">
+            <div class="col-md-3">
+                <input type="text" class="form-control mb-2" name="source" placeholder="Source" required>
+            </div>
+            <div class="col-md-3">
+                <input type="text" class="form-control mb-2" name="nom_contact" placeholder="Nom Contact" required>
+            </div>
+            <div class="col-md-3">
+                <input type="text" class="form-control mb-2" name="adresse" placeholder="Adresse" required>
+            </div>
+            <div class="col-md-3">
+                <input type="number" class="form-control mb-2" name="prix" placeholder="Prix">
+            </div>
+            <div class="col-md-12">
+                <button type="submit" class="btn btn-primary">Ajouter Lead</button>
+            </div>
+        </div>
+    </form>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Source</th>
+                <th>Nom</th>
+                <th>Adresse</th>
+                <th>Prix</th>
+                <th>Date</th>
+                <th>Photo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for lead in leads %}
+                <tr>
+                    <td>{{ lead[0] }}</td>
+                    <td>{{ lead[1] }}</td>
+                    <td>{{ lead[2] }}</td>
+                    <td>{{ lead[3] }}</td>
+                    <td>{{ lead[4] }}</td>
+                    <td>{{ lead[5] }}</td>
+                    <td>
+                        {% if lead[6] %}
+                            <img src="{{ url_for('serve_image', filename=lead[6]) }}" alt="Photo" style="max-width: 100px;">
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

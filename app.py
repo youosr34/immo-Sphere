@@ -8,7 +8,34 @@ from datetime import datetime
 from PIL import Image, ImageEnhance
 import os
 
-app = Flask(__name__) init_db()
+def init_db():
+    with sqlite3.connect('crm.db') as conn:
+        curseur = conn.cursor()
+        curseur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL
+            )
+        ''')
+        curseur.execute('''
+            CREATE TABLE IF NOT EXISTS pige (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT,
+                nom_contact TEXT,
+                adresse TEXT,
+                prix REAL,
+                date_ajout TEXT,
+                photo_path TEXT,
+                user_id INTEGER,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+        curseur.execute('INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)', ('admin', 'admin123'))
+        conn.commit()
+
+app = Flask(__name__) 
+init_db()
 app.secret_key = os.environ.get('SECRET_KEY', 'ma_cle_secrete_123')
 app.config['UPLOAD_FOLDER'] = 'static/images'
 
@@ -23,44 +50,13 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    conn = sqlite3.connect('crm.db')
-    curseur = conn.cursor()
-    curseur.execute('SELECT id, username FROM users WHERE id = ?', (user_id,))
-    user = curseur.fetchone()
-    conn.close()
-    if user:
-        return User(user[0], user[1])
-    return None
-
-def init_db():
-    conn = sqlite3.connect('crm.db')
-    curseur = conn.cursor()
-    curseur.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL
-        )
-    ''')
-    curseur.execute('''
-        CREATE TABLE IF NOT EXISTS pige (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            source TEXT,
-            nom_contact TEXT,
-            adresse TEXT,
-            prix REAL,
-            date_ajout TEXT,
-            photo_path TEXT,
-            user_id INTEGER,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-    try:
-        curseur.execute('INSERT INTO users (username, password) VALUES (?, ?)', ('admin', 'admin123'))
-        conn.commit()
-    except sqlite3.IntegrityError:
-        pass
-    conn.close()
+    with sqlite3.connect('crm.db') as conn:
+        curseur = conn.cursor()
+        curseur.execute('SELECT id, username FROM users WHERE id = ?', (user_id,))
+        user = curseur.fetchone()
+        if user:
+            return User(user[0], user[1])
+        return None
 
 class PhotoForm(FlaskForm):
     photo = FileField('Uploader une photo', validators=[DataRequired()])
@@ -75,10 +71,10 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        conn = sqlite3.connect('crm.db')
-        curseur = conn.cursor()
-        curseur.execute('SELECT id, username FROM users WHERE username = ? AND password = ?', 
-                        (username, password))
+        with sqlite3.connect('crm.db') as conn:
+            curseur = conn.cursor()
+            curseur.execute('SELECT id, username FROM users WHERE username = ? AND password = ?', 
+                            (username, password))
         user = curseur.fetchone()
         conn.close()
         if user:
@@ -102,8 +98,8 @@ def dashboard():
 @app.route('/pige', methods=['GET', 'POST'])
 @login_required
 def pige():
-    conn = sqlite3.connect('crm.db')
-    curseur = conn.cursor()
+    with sqlite3.connect('crm.db') as conn:
+        curseur = conn.cursor()
     
     if request.method == 'POST':
         source = request.form.get('source', '')
@@ -143,8 +139,8 @@ def photo_staging():
         processed_filepath = os.path.join(app.config['UPLOAD_FOLDER'], processed_filename)
         img_enhanced.save(processed_filepath)
         
-        conn = sqlite3.connect('crm.db')
-        curseur = conn.cursor()
+        with sqlite3.connect('crm.db') as conn:
+            curseur = conn.cursor()
         curseur.execute('UPDATE pige SET photo_path = ? WHERE id = (SELECT MAX(id) FROM pige WHERE user_id = ?)',
                         (processed_filename, current_user.id))
         conn.commit()
@@ -160,6 +156,5 @@ def serve_image(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == '__main__':
-    init_db()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)

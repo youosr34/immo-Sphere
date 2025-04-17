@@ -35,7 +35,76 @@ def init_db():
         conn.commit()
 
 app = Flask(__name__) 
-init_db()
+def init_db():
+    with sqlite3.connect('crm.db') as conn:
+        curseur = conn.cursor()
+        # Table users (inchangée)
+        curseur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL
+            )
+        ''')
+        # Table propriétaires
+        curseur.execute('''
+            CREATE TABLE IF NOT EXISTS proprietaires (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom TEXT NOT NULL,
+                email TEXT,
+                telephone TEXT,
+                adresse TEXT,
+                user_id INTEGER,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+        # Table acquéreurs
+        curseur.execute('''
+            CREATE TABLE IF NOT EXISTS acquereurs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom TEXT NOT NULL,
+                email TEXT,
+                telephone TEXT,
+                budget REAL,
+                criteres TEXT,
+                user_id INTEGER,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+        # Table prospects
+        curseur.execute('''
+            CREATE TABLE IF NOT EXISTS prospects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom TEXT,
+                email TEXT,
+                telephone TEXT,
+                source TEXT,
+                interet TEXT,
+                statut TEXT,
+                user_id INTEGER,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+        # Table biens (remplace pige pour plus de clarté)
+        curseur.execute('''
+            CREATE TABLE IF NOT EXISTS biens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT,
+                adresse TEXT,
+                prix REAL,
+                surface REAL,
+                description TEXT,
+                photo_path TEXT,
+                statut TEXT,
+                proprietaire_id INTEGER,
+                user_id INTEGER,
+                FOREIGN KEY (proprietaire_id) REFERENCES proprietaires(id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+        # Admin par défaut
+        curseur.execute('INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)', ('admin', 'admin123'))
+        conn.commit()
 app.secret_key = os.environ.get('SECRET_KEY', 'ma_cle_secrete_123')
 app.config['UPLOAD_FOLDER'] = 'static/images'
 
@@ -121,35 +190,48 @@ def pige():
 def photo_staging():
     form = PhotoForm()
     processed_image = None
-    
     if form.validate_on_submit():
         photo = form.photo.data
         filename = f"{current_user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         photo.save(filepath)
-        
         img = Image.open(filepath)
         img_enhanced = ImageEnhance.Brightness(img).enhance(1.2)
         img_enhanced = ImageEnhance.Contrast(img_enhanced).enhance(1.3)
         img_enhanced = ImageEnhance.Sharpness(img_enhanced).enhance(1.5)
-        
         processed_filename = f"enhanced_{filename}"
         processed_filepath = os.path.join(app.config['UPLOAD_FOLDER'], processed_filename)
         img_enhanced.save(processed_filepath)
-        
         with sqlite3.connect('crm.db') as conn:
             curseur = conn.cursor()
-        curseur.execute('UPDATE pige SET photo_path = ? WHERE id = (SELECT MAX(id) FROM pige WHERE user_id = ?)',
-                        (processed_filename, current_user.id))
-        conn.commit()
-        conn.close()
-        
+            curseur.execute('UPDATE pige SET photo_path = ? WHERE id = (SELECT MAX(id) FROM pige WHERE user_id = ?)',
+                           (processed_filename, current_user.id))
+            conn.commit()
         processed_image = processed_filename
         flash('Photo améliorée avec succès !')
-
     return render_template('photo_staging.html', form=form, processed_image=processed_image)
+@app.route('/acquereurs', methods=['GET', 'POST'])
+@login_required
+def acquereurs():
+    if request.method == 'POST':
+        nom = request.form.get('nom')
+        email = request.form.get('email')
+        telephone = request.form.get('telephone')
+        budget = float(request.form.get('budget')) if request.form.get('budget') else None
+        criteres = request.form.get('criteres')
+        with sqlite3.connect('crm.db') as conn:
+            curseur = conn.cursor()
+            curseur.execute('INSERT INTO acquereurs (nom, email, telephone, budget, criteres, user_id) VALUES (?, ?, ?, ?, ?, ?)',
+                           (nom, email, telephone, budget, criteres, current_user.id))
+            conn.commit()
+            flash('Acquéreur ajouté !')
+        return redirect(url_for('acquereurs'))
+    with sqlite3.connect('crm.db') as conn:
+        curseur = conn.cursor()
+        curseur.execute('SELECT id, nom, email, telephone, budget, criteres FROM acquereurs WHERE user_id = ?', (current_user.id,))
+        acquereurs = curseur.fetchall()
+    return render_template('acquereurs.html', acquereurs=acquereurs)
 
 @app.route('/images/<filename>')
 def serve_image(filename):
